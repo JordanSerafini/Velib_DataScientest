@@ -4,7 +4,6 @@ team: "Jordan S., Abdelmalek B."
 formation: "RNCP 7 – Machine Learning & IA – DataScientest"
 period: "Sept.–Nov. 2025"
 role: "Data Product Manager (binôme)"
-rewritten_for: "Soutenance orale – version étudiante plausible"
 ---
 
 # 2.2 — Évaluer et challenger un MVP
