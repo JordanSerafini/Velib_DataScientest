@@ -1,0 +1,64 @@
+@startuml Personas
+title Les 3 Personas - Projet Vélib'
+
+package "Alice - Navetteuse" #lightblue {
+  note as alice
+    **Alice, 32 ans**
+    Commuter quotidien
+
+    **Usage** :
+    Domicile-travail
+    2x/jour (8h15 et 18h30)
+
+    **Pain points** :
+    - Station vide le matin
+    - Station pleine le soir
+    - Pas de VAE dispo
+
+    **Besoins** :
+    - Fiabilité
+    - Prédictions
+  end note
+}
+
+package "Marco - Touriste" #lightgreen {
+  note as marco
+    **Marco, 27 ans**
+    Touriste occasionnel
+
+    **Usage** :
+    2-3 trajets/week-end
+    Visiteur Paris
+
+    **Pain points** :
+    - Inscription complexe
+    - Messages pas clairs
+    - Station pleine
+
+    **Besoins** :
+    - Simplicité
+    - Assistance
+  end note
+}
+
+package "Julien - Régulateur" #lightyellow {
+  note as julien
+    **Julien, 41 ans**
+    Logisticien Smovengo
+
+    **Usage** :
+    Planification tournées
+    Travail de nuit
+
+    **Pain points** :
+    - Pas de priorisation
+    - Tournées inefficaces
+    - Pas de visibilité
+
+    **Besoins** :
+    - Prédictions ML
+    - Optimisation
+  end note
+}
+
+@enduml

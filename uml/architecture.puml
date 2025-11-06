@@ -1,0 +1,62 @@
+@startuml Architecture système
+title Architecture Vélib' - Vue simplifiée
+
+cloud "GBFS API" as GBFS
+
+rectangle "Ingestion\n(Lambda 60s)" as Ingestion
+
+database "PostgreSQL\nRDS" as DB {
+  [dim_station]
+  [fct_station_snapshot]
+}
+
+rectangle "Epic A1\nDashboard BI" as BI {
+  [Metabase]
+}
+
+rectangle "Epic A2\nML Prédiction" as ML {
+  [API FastAPI]
+  [LightGBM]
+}
+
+actor "Managers" as Managers
+actor "Régulateurs" as Regulateurs
+actor "Usagers" as Users
+
+GBFS --> Ingestion : JSON\n(60s)
+Ingestion --> DB : INSERT
+
+DB --> BI : SELECT
+BI --> Managers : Dashboard Web
+
+DB --> ML : SELECT
+ML --> Regulateurs : App Mobile\n(Prédictions)
+
+note bottom of GBFS
+  **Source** : transport.data.gouv.fr
+  Update : ~60 secondes
+  Format : GBFS v2.3
+end note
+
+note bottom of DB
+  **Stockage** : PostgreSQL 15
+  Volume : ~11 Go (3 ans)
+  Coût : ~50€/mois
+end note
+
+note bottom of BI
+  **Visualisations** :
+  • KPIs (SOR, DOR)
+  • Top 10 stations critiques
+  • Heatmap créneau × jour
+end note
+
+note bottom of ML
+  **Prédiction** :
+  • Criticité +30 min
+  • 3 classes (Normal/Attention/Critique)
+  • Accuracy : ≥ 80%
+  • Latence : < 200ms
+end note
+
+@enduml

@@ -1,0 +1,45 @@
+@startuml Schéma de données
+title Schéma PostgreSQL - Vélib' (Star Schema)
+
+' Table dimension
+class dim_station <<dimension>> {
+  + **station_id** : INT
+  --
+  + name : TEXT
+  + capacity : INT
+  + lat : DOUBLE
+  + lon : DOUBLE
+  + commune : TEXT
+}
+
+' Table faits
+class fct_station_snapshot <<fact>> {
+  + **ts** : TIMESTAMPTZ
+  + **station_id** : INT
+  --
+  + bikes_mech : INT
+  + bikes_elec : INT
+  + docks_free : INT
+}
+
+fct_station_snapshot "N" --> "1" dim_station : station_id
+
+note right of dim_station
+  **Table dimensionnelle**
+  ~1400-1500 lignes
+  Données statiques
+end note
+
+note right of fct_station_snapshot
+  **Table de faits (time-series)**
+  Partitionnée par date
+  ~2,5M lignes/jour
+  Historique 6-12 mois
+
+  **Métriques calculées** :
+  • SOR = % temps bikes = 0
+  • DOR = % temps docks = 0
+  • TOH = mouvements/heure
+end note
+
+@enduml
