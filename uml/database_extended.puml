@@ -1,0 +1,198 @@
+@startuml Schéma BDD Vélib' Étendu
+title Schéma PostgreSQL Vélib' - Vue complète simplifiée
+
+' ========== TABLES DE BASE (Données brutes) ==========
+
+package "Données de base" #LightBlue {
+
+  class dim_station <<dimension>> {
+    + **station_id** : INT
+    --
+    + name : TEXT
+    + capacity : INT
+    + lat : DOUBLE
+    + lon : DOUBLE
+    + commune : TEXT
+    + arrondissement : TEXT
+    + created_at : TIMESTAMP
+  }
+
+  class fct_station_snapshot <<fact>> {
+    + **ts** : TIMESTAMPTZ
+    + **station_id** : INT
+    --
+    + bikes_mech : INT
+    + bikes_elec : INT
+    + docks_free : INT
+    + num_bikes_available : INT
+    + is_installed : BOOLEAN
+    + is_renting : BOOLEAN
+  }
+
+}
+
+' ========== TABLES KPI (Agrégations) ==========
+
+package "Tables KPI agrégées" #LightGreen {
+
+  class kpi_sor_daily <<aggregated>> {
+    + **date** : DATE
+    + **station_id** : INT
+    --
+    + sor_pct : DECIMAL(5,2)
+    + nb_snapshots_zero : INT
+    + nb_snapshots_total : INT
+    + peak_am_sor : DECIMAL(5,2)
+    + peak_pm_sor : DECIMAL(5,2)
+  }
+
+  class kpi_dor_daily <<aggregated>> {
+    + **date** : DATE
+    + **station_id** : INT
+    --
+    + dor_pct : DECIMAL(5,2)
+    + nb_snapshots_zero : INT
+    + nb_snapshots_total : INT
+    + peak_am_dor : DECIMAL(5,2)
+    + peak_pm_dor : DECIMAL(5,2)
+  }
+
+  class kpi_global_daily <<aggregated>> {
+    + **date** : DATE
+    --
+    + avg_sor : DECIMAL(5,2)
+    + avg_dor : DECIMAL(5,2)
+    + nb_critical_stations : INT
+    + total_stations_active : INT
+    + avg_bikes_available : DECIMAL(8,2)
+  }
+
+}
+
+' ========== TABLES MÉTIER (Anomalies, Rééquilibrage) ==========
+
+package "Tables métier" #LightYellow {
+
+  class anomaly <<business>> {
+    + **anomaly_id** : SERIAL
+    --
+    + station_id : INT
+    + detected_at : TIMESTAMPTZ
+    + resolved_at : TIMESTAMPTZ
+    + anomaly_type : TEXT
+    + severity : TEXT
+    + description : TEXT
+    + mttr_hours : DECIMAL(8,2)
+  }
+
+  class rebalancing_tour <<business>> {
+    + **tour_id** : SERIAL
+    --
+    + tour_date : DATE
+    + start_time : TIMESTAMPTZ
+    + end_time : TIMESTAMPTZ
+    + nb_stations_visited : INT
+    + nb_bikes_moved : INT
+    + km_traveled : DECIMAL(8,2)
+    + efficiency_score : DECIMAL(5,2)
+    + status : TEXT
+  }
+
+  class rebalancing_action <<business>> {
+    + **action_id** : SERIAL
+    --
+    + tour_id : INT
+    + station_id : INT
+    + action_time : TIMESTAMPTZ
+    + bikes_added : INT
+    + bikes_removed : INT
+    + station_state_before : TEXT
+    + station_state_after : TEXT
+  }
+
+}
+
+' ========== TABLES ML (Prédictions) ==========
+
+package "Tables ML (Epic A2)" #LightPink {
+
+  class prediction_criticality <<ml>> {
+    + **prediction_id** : SERIAL
+    --
+    + station_id : INT
+    + prediction_time : TIMESTAMPTZ
+    + horizon_minutes : INT
+    + predicted_class : TEXT
+    + confidence_score : DECIMAL(5,2)
+    + actual_class : TEXT
+    + model_version : TEXT
+  }
+
+}
+
+' ========== RELATIONS ==========
+
+fct_station_snapshot "N" -up-> "1" dim_station : station_id
+
+kpi_sor_daily "N" -up-> "1" dim_station : station_id
+kpi_dor_daily "N" -up-> "1" dim_station : station_id
+
+anomaly "N" -up-> "1" dim_station : station_id
+
+rebalancing_action "N" -up-> "1" dim_station : station_id
+rebalancing_action "N" -up-> "1" rebalancing_tour : tour_id
+
+prediction_criticality "N" -up-> "1" dim_station : station_id
+
+' ========== NOTES ==========
+
+note right of dim_station
+  **Table dimensionnelle**
+  ~1 400-1 500 lignes
+  Mise à jour : rare (nouveaux sites)
+end note
+
+note right of fct_station_snapshot
+  **Table de faits (time-series)**
+  ~2,5 millions lignes/jour
+  Partitionnée par date (RANGE)
+  Rétention : 6-12 mois
+end note
+
+note bottom of kpi_sor_daily
+  **Tables KPI calculées**
+  Agrégées quotidiennement
+  Facilite requêtes Dashboard
+  Calculées via jobs SQL/Python
+end note
+
+note bottom of anomaly
+  **Types anomalies** :
+  • BLOCKED_BIKE
+  • STATION_OFFLINE
+  • SENSOR_ERROR
+
+  **Severity** :
+  • LOW, MEDIUM, HIGH, CRITICAL
+end note
+
+note bottom of rebalancing_tour
+  **Efficacité rééquilibrage** :
+  (Stations corrigées / Total visités) × 100
+
+  **Status** :
+  • PLANNED, IN_PROGRESS
+  • COMPLETED, CANCELLED
+end note
+
+note bottom of prediction_criticality
+  **Classes prédites** :
+  • 🟢 NORMAL (OK)
+  • 🟠 ATTENTION (surveillé)
+  • 🔴 CRITIQUE (action requise)
+
+  Horizon : +30 min
+  Model : LightGBM
+end note
+
+@enduml

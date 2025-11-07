@@ -1,0 +1,112 @@
+@startuml Traitement des KPI Vélib'
+title Cheminement de traitement des KPI - De l'API aux Dashboards
+
+skinparam componentStyle rectangle
+
+' Sources de données
+cloud "GBFS API\nVélib'" as API {
+  [station_status.json]
+  [station_information.json]
+}
+
+' Couche 1: Ingestion
+package "Couche 1: Ingestion" {
+  component "Scheduler\n(Airflow/Cron)" as Scheduler
+  component "Script Python\nfetch_gbfs.py" as Fetcher
+
+  Scheduler -down-> Fetcher : Trigger\ntoutes les 60s
+}
+
+' Couche 2: Stockage brut
+database "PostgreSQL" as DB {
+  frame "Tables de base" {
+    [dim_station]
+    [fct_station_snapshot]
+  }
+}
+
+' Couche 3: Transformation & Agrégation
+package "Couche 3: Traitement KPI" {
+  component "Jobs SQL\n(vues matérialisées)" as SQLJobs
+  component "Script Python\ncalculate_kpi.py" as KPICalc
+
+  note right of SQLJobs
+    **Requêtes SQL pour KPI** :
+    • Agrégations temporelles
+    • Filtres par plage horaire
+    • Calculs de pourcentages
+  end note
+}
+
+' Couche 4: Stockage KPI
+database "PostgreSQL" as DB2 {
+  frame "Tables KPI agrégées" {
+    [kpi_sor_by_station]
+    [kpi_dor_by_station]
+    [kpi_rebalancing_efficiency]
+    [kpi_global_daily]
+  }
+}
+
+' Couche 5: Visualisation
+package "Couche 5: Visualisation" {
+  component "Metabase\nDashboard" as Metabase
+  component "Notebook Jupyter\nAnalyse" as Jupyter
+}
+
+' Utilisateurs finaux
+actor "Managers\nOpérations" as Managers
+actor "Data Scientists" as DS
+
+' Flux de données
+API -down-> Fetcher : HTTP GET\nJSON
+Fetcher -down-> DB : INSERT INTO\nfct_station_snapshot
+
+DB -down-> SQLJobs : SELECT\n(requêtes time-series)
+SQLJobs -down-> KPICalc : Données\nagrégées
+KPICalc -down-> DB2 : INSERT/UPDATE\ntables KPI
+
+DB2 -down-> Metabase : SELECT\n(dashboards)
+DB2 -down-> Jupyter : pandas.read_sql()
+
+Metabase -down-> Managers : Consultation\nDashboard Web
+Jupyter -down-> DS : Analyse\napprofondie
+
+' Détails des KPI calculés
+note bottom of KPICalc
+  **KPI calculés** :
+
+  **SOR** (Stock-Out Rate) :
+  • % temps avec bikes_total = 0
+  • Baseline : 8.5%
+  • Target : -20% (→ 6.8%)
+
+  **DOR** (Dock-Out Rate) :
+  • % temps avec docks_free = 0
+  • Baseline : 6.2%
+  • Target : -15% (→ 5.3%)
+
+  **RE** (Rebalancing Efficiency) :
+  • Succès tournées rééquilibrage
+  • Baseline : 65%
+  • Target : ≥ 75%
+
+  **JAR** (Journey Abandon Rate) :
+  • % abandons de trajet
+  • Target : -10 à -15%
+
+  **MTTR** (Mean Time To Repair) :
+  • Temps moyen résolution anomalie
+  • Target : -10 à -15%
+end note
+
+' Fréquences de traitement
+note left of Scheduler
+  **Fréquences** :
+  • Ingestion : 60s (temps réel)
+  • KPI horaires : 1h
+  • KPI quotidiens : 00:30 UTC
+  • KPI hebdo : Lundi 01:00
+end note
+
+@enduml
